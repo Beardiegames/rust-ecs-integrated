@@ -101,7 +101,7 @@ impl<Components: Clone + Default> ECS<Components> {
     pub fn get_entities<F> (&mut self, mut action: F) 
         where F: FnMut(&Pointer, &mut Components)
     {
-        self.entities.edit_all(|e| action(&e.pointer(), &mut e.components));
+        self.entities.edit_all(|e| action(&e.pointer, &mut e.components));
     }
 
     /// Read or write an entity by passing it through a callback function
@@ -119,9 +119,13 @@ impl<Components: Clone + Default> ECS<Components> {
     /// capacity has been reached and no new entities could be spawned.
     /// 
     pub fn spawn_entity (&mut self) -> Result<Pointer, &str> {
-        self.entities.spawn().map_err(
-            |_e| "Unable to spawn new entities, maximum poolsize reached!"
-        )
+        match self.entities.spawn() {
+            Ok(pointer) => {
+                self.entities.edit(&pointer, |x| x.pointer = pointer.clone());
+                Ok(pointer)
+            },
+            Err(_e) => Err("Unable to spawn new entities, maximum poolsize reached!"),
+        }
     }
 
     /// Remove an allready spawned entity
@@ -150,7 +154,7 @@ impl<Components: Clone + Default> ECS<Components> {
     /// 
     pub fn update(&mut self) {
         for system in &mut self.systems {
-            self.entities.edit_all(|e| system.update(&e.pointer(), &mut e.components)); 
+            self.entities.edit_all(|e| system.update(&e.pointer, &mut e.components)); 
         }
     }
 }
