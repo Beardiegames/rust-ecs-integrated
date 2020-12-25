@@ -14,14 +14,14 @@
 //! // register systems
 //! let mut system_pointer = ecs.register_system(ExampleSystem::new());
 //! // spawn entities
-//! let mut entity_pointer = ecs.entities().spawn().unwrap(); 
+//! let mut entity_pointer = ecs.spawn_entity().unwrap(); 
 //! 
 //! ecs.update(); // update all systems registered.
 //! 
 //! // test if the update methode on our System has been called.
 //! assert!(ecs.get_system::<ExampleSystem>(system_pointer).unwrap().was_called); 
 //! // test if our Entity has been updated.
-//! ecs.entities().edit(&entity_pointer, |e| assert_eq!(e.components.value, 1));
+//! ecs.get_entity(&entity_pointer, |c| assert_eq!(c.value, 1));
 //! ```
 //! 
 
@@ -96,10 +96,52 @@ impl<Components: Clone + Default> ECS<Components> {
         self.systems[sys_pointer].as_any().downcast_mut::<BaseType>()
     }
 
-    /// Returns a mutable reference to the Pool, see entity module for more information.
+    /// Loop through all entities and pass them through a callback funtion
     /// 
-    pub fn entities(&mut self) -> &mut Pool<Entity<Components>> {
-        &mut self.entities
+    pub fn get_entities<F> (&mut self, mut action: F) 
+        where F: FnMut(&Pointer, &mut Components)
+    {
+        self.entities.edit_all(|e| action(&e.pointer(), &mut e.components));
+    }
+
+    /// Read or write an entity by passing it through a callback function
+    /// 
+    pub fn get_entity<F> (&mut self, entity: &Pointer, mut action: F) 
+        where F: FnMut(&mut Components)
+    {
+        self.entities.edit(entity, |e| action(&mut e.components));
+    }
+
+    /// Spawn a new entity
+    /// 
+    /// Returns an Ok(Pointer) that hold a reference to the 
+    /// entity within the entity pool, or returns a Err(&str) if the max entity 
+    /// capacity has been reached and no new entities could be spawned.
+    /// 
+    pub fn spawn_entity (&mut self) -> Result<Pointer, &str> {
+        self.entities.spawn().map_err(
+            |_e| "Unable to spawn new entities, maximum poolsize reached!"
+        )
+    }
+
+    /// Remove an allready spawned entity
+    /// 
+    /// This does not remove any data the entity might hold (see wipe_entity for
+    /// more information), it is only removed from the update list to maintain
+    /// performance.
+    /// 
+    pub fn destroy_entity (&mut self, entity: &Pointer) {
+        self.entities.destroy(entity)
+    }
+
+    /// Reset an entities data to default even if an entity has allready been 
+    /// destroyed (see destroy_entity)
+    /// 
+    /// This might come in handy if entities data hold references to callback 
+    /// methodes that could affect the codebase in a nagative way.
+    /// 
+    pub fn wipe_entity (&mut self, entity: &Pointer) {
+        self.entities.wipe(entity)
     }
 
     /// Update all registered systems
@@ -173,9 +215,8 @@ mod tests {
     /// unit tests
 
     #[test]
-    fn ecs_builder() {
+    fn create_new_ecs() {
         let mut ecs = ECS::<ExampleComponents>::new(100);
-        assert_eq! (ecs.entities().size(), 100);
     }
 
     #[test]
@@ -201,10 +242,10 @@ mod tests {
         let mut ecs = ECS::<ExampleComponents>::new(1);
         let sys_pointer = ecs.register_system(assert_sys);
 
-        let spawn1 = ecs.entities().spawn();
+        let spawn1 = ecs.spawn_entity();
         assert_eq!(spawn1.is_err(), false, "Spawn should return a pointer");
         let pointer = spawn1.unwrap();
-        
+
         match ecs.get_system::<AssertSystem>(sys_pointer) {
             Some(sys) => {
                 sys.expected_pointer = pointer;
@@ -220,8 +261,7 @@ mod tests {
             None => assert!(false, "unable to downcast!"),
         }
 
-        assert_eq!(ecs.entities().spawn().unwrap_err(), PoolError::Overflow, 
-            "Spawn should return Err(PoolError::Overflow)!");
+        assert!(ecs.spawn_entity().is_err(), "Spawn should return an overflow error");
     }
 
     #[test]
@@ -229,27 +269,27 @@ mod tests {
 
         let mut ecs1 = ECS::<ExampleComponents>::new(100);
         let system1 = ecs1.register_system(AddSystem);
-        let entity1 = ecs1.entities().spawn().unwrap();
+        let entity1 = ecs1.spawn_entity().unwrap();
         
         let mut ecs2 = ECS::<ExampleComponents>::new(100);
         let system2 = ecs2.register_system(AddSystem);
         let system3 = ecs2.register_system(SubtractSystem);
-        let entity2 = ecs2.entities().spawn().unwrap();
+        let entity2 = ecs2.spawn_entity().unwrap();
 
-        ecs1.entities().edit(&entity1, |e| assert_eq!(e.components.value, 0));
+        ecs1.get_entity(&entity1, |c| assert_eq!(c.value, 0));
         ecs1.update();
-        ecs1.entities().edit(&entity1, |e| assert_eq!(e.components.value, 1));
+        ecs1.get_entity(&entity1, |c| assert_eq!(c.value, 1));
 
-        ecs2.entities().edit(&entity2, |e| assert_eq!(e.components.value, 0));
+        ecs2.get_entity(&entity2, |c| assert_eq!(c.value, 0));
         ecs2.update(); 
-        ecs2.entities().edit(&entity2, |e| assert_eq!(e.components.value, 0));
+        ecs2.get_entity(&entity2, |c| assert_eq!(c.value, 0));
     }
 
     #[test]
     fn test_speed() {
         let mut ecs = ECS::<ExampleComponents>::new(1);
         ecs.register_system(AddSystem);
-        let entity_pointer = ecs.entities().spawn().unwrap();
+        let entity_pointer = ecs.spawn_entity().unwrap();
 
         let num_calls = 7_200_000;  // <-- number of calls per frame
         let fps = 30;               // <-- number of frames per second
@@ -281,8 +321,6 @@ Try testing in release mode: cargo test --release",
             );
         }
 
-        ecs.entities().edit(&entity_pointer, |e| {
-            assert_eq!(e.components.value, num_calls * fps);
-        });
+        ecs.get_entity(&entity_pointer, |c| assert_eq!(c.value, num_calls*fps));
     }
 }

@@ -3,7 +3,7 @@
 //! 
 //! ```
 //! use ecs::component::ExampleComponents;
-//! use ecs::entities::Entity;
+//! use ecs::pool::Pointer;
 //! use ecs::system::System;
 //! use std::any::Any;
 //! 
@@ -20,8 +20,8 @@
 //!
 //! impl System<ExampleComponents> for ExampleSystem {
 //! 
-//!     fn update (&mut self, entity: &mut Entity<ExampleComponents>) {
-//!         entity.components.value += 1;
+//!     fn update (&mut self, entity: &Pointer, components: &mut ExampleComponents) {
+//!         components.value += 1;
 //!         self.was_called = true;
 //!     }
 //!
