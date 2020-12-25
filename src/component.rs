@@ -19,7 +19,29 @@
 
 use crate::pool::Pool;
 
+
+#[derive(Clone)]
+pub enum ExampleEvents {
+    Damage(f32),
+    Heal(f32),
+    Say(String),
+}
+
+pub trait Components: Clone + Default {
+    type Events: Clone;
+
+    fn event_handler(&mut self, event: Self::Events);
+}
+
 #[derive(Clone, Default)]
 pub struct ExampleComponents {
     pub value: u64,
+}
+
+impl Components for ExampleComponents {
+    type Events = ExampleEvents;
+
+    fn event_handler(&mut self, event: Self::Events) {
+        // handle incoming events
+    }
 }

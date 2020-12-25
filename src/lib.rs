@@ -45,14 +45,33 @@ use pool::*;
 /// SystemPointer is used to locate registered Systems within the ECS module.
 type SystemPointer = usize;
 
-/// ECS manages registered Systems and controls the Pool which manages all Entities.
-///
-pub struct ECS<Components: Clone + Default> {
-    systems: Vec<Box<dyn System<Components>>>,
-    entities: Pool<Entity<Components>>,
+#[derive(Clone)]
+pub struct EventHook<Events: Clone> {
+    target: Pointer,
+    event: Events,
 }
 
-impl<Components: Clone + Default> ECS<Components> {
+pub struct EventHooks<Events: Clone> (Vec<EventHook<Events>>);
+
+impl<Events: Clone> EventHooks<Events> {
+
+    pub fn tell(&mut self, entity: Pointer, todo: Events) {
+        self.0.push(EventHook { target: entity, event: todo })
+    }
+
+    pub fn clear(&mut self) { self.0.clear() }
+
+    pub fn list(&self) -> &Vec<EventHook<Events>> { &self.0 }
+}
+
+/// ECS manages registered Systems and controls the Pool which manages all Entities.
+///
+pub struct ECS<C: Components> {
+    systems: Vec<Box<dyn System<C>>>,
+    entities: Pool<Entity<C>>,
+}
+
+impl<C: Components> ECS<C> {
 
     /// Instantiate a new ECS manager
     /// 
@@ -78,7 +97,7 @@ impl<Components: Clone + Default> ECS<Components> {
     /// the System is handed over to the ECS manager.
     /// 
     pub fn register_system<S> (&mut self, system: S) -> SystemPointer
-        where S: System<Components> + 'static
+        where S: System<C> + 'static
     {
         self.systems.push(Box::new(system));
         self.systems.len() - 1
@@ -99,7 +118,7 @@ impl<Components: Clone + Default> ECS<Components> {
     /// Loop through all entities and pass them through a callback funtion
     /// 
     pub fn get_entities<F> (&mut self, mut action: F) 
-        where F: FnMut(&Pointer, &mut Components)
+        where F: FnMut(&Pointer, &mut C)
     {
         self.entities.edit_all(|e| action(&e.pointer, &mut e.components));
     }
@@ -107,7 +126,7 @@ impl<Components: Clone + Default> ECS<Components> {
     /// Read or write an entity by passing it through a callback function
     /// 
     pub fn get_entity<F> (&mut self, entity: &Pointer, mut action: F) 
-        where F: FnMut(&mut Components)
+        where F: FnMut(&mut C)
     {
         self.entities.edit(entity, |e| action(&mut e.components));
     }
@@ -153,8 +172,15 @@ impl<Components: Clone + Default> ECS<Components> {
     /// Put this inside a loop to update your Systems every frame.
     /// 
     pub fn update(&mut self) {
+        let mut events = EventHooks(Vec::new());
+
         for system in &mut self.systems {
-            self.entities.edit_all(|e| system.update(&e.pointer, &mut e.components)); 
+            events.clear();  
+            self.entities.edit_all(|e| system.update(&e.pointer, &mut e.components, &mut events)); 
+            
+            for hook in events.list() {
+                self.entities.edit(&hook.target, |e| e.components.event_handler(hook.event.clone()));
+            }
         }
     }
 }
@@ -173,10 +199,11 @@ mod tests {
         is_called: bool,
     }
     impl System<ExampleComponents> for AssertSystem {
-        fn update (
+        fn update(
             &mut self, 
             entity: &Pointer,
-            components: &mut ExampleComponents
+            components: &mut ExampleComponents,
+            events: &mut EventHooks<<ExampleComponents as Components>::Events>,
         ){
             assert_eq!(*entity, self.expected_pointer, "AssertSystem -- assert pointer failed!");
             assert_eq!(components.value, self.expected_value, "AssertSystem -- assert components.value failed!");
@@ -190,10 +217,11 @@ mod tests {
 
     struct AddSystem;
     impl System<ExampleComponents> for AddSystem {
-        fn update (
+        fn update(
             &mut self, 
             entity: &Pointer,
-            components: &mut ExampleComponents
+            components: &mut ExampleComponents,
+            events: &mut  EventHooks<<ExampleComponents as Components>::Events>,
         ) {
             components.value += 1;
         }
@@ -203,10 +231,11 @@ mod tests {
 
     struct SubtractSystem;
     impl System<ExampleComponents> for SubtractSystem {
-        fn update (
+        fn update(
             &mut self, 
             entity: &Pointer,
-            components: &mut ExampleComponents
+            components: &mut ExampleComponents,
+            events: &mut  EventHooks<<ExampleComponents as Components>::Events>
         ) {
             if components.value > 0 {
                 components.value -= 1;
@@ -295,7 +324,7 @@ mod tests {
         ecs.register_system(AddSystem);
         let entity_pointer = ecs.spawn_entity().unwrap();
 
-        let num_calls = 7_200_000;  // <-- number of calls per frame
+        let num_calls = 3_000_000;  // <-- number of calls per frame
         let fps = 30;               // <-- number of frames per second
         let max = std::time::Duration::from_millis(1000 / fps);
 

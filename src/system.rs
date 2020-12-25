@@ -2,7 +2,8 @@
 //! # Example System Implementation
 //! 
 //! ```
-//! use ecs::component::ExampleComponents;
+//! use ecs::EventHooks;
+//! use ecs::component::{ Components, ExampleComponents };
 //! use ecs::pool::Pointer;
 //! use ecs::system::System;
 //! use std::any::Any;
@@ -20,7 +21,12 @@
 //!
 //! impl System<ExampleComponents> for ExampleSystem {
 //! 
-//!     fn update (&mut self, entity: &Pointer, components: &mut ExampleComponents) {
+//!     fn update(
+//!         &mut self, 
+//!         entity: &Pointer, 
+//!         components: &mut ExampleComponents, 
+//!         events: &mut EventHooks<<ExampleComponents as Components>::Events>
+//!     ) {
 //!         components.value += 1;
 //!         self.was_called = true;
 //!     }
@@ -29,8 +35,9 @@
 //! }
 //! ```
 
+use crate::*;
 use crate::entities::Entity;
-use crate::component::ExampleComponents;
+use crate::component::*;
 use crate::pool::Pointer;
 use std::any::Any;
 
@@ -48,7 +55,12 @@ impl ExampleSystem {
 
 impl System<ExampleComponents> for ExampleSystem {
 
-    fn update (&mut self, entity: &Pointer, components: &mut ExampleComponents) {
+    fn update(
+        &mut self, 
+        entity: &Pointer, 
+        components: &mut ExampleComponents, 
+        events: &mut EventHooks<<ExampleComponents as Components>::Events>
+    ) {
         components.value += 1;
         self.was_called = true;
     }
@@ -56,15 +68,16 @@ impl System<ExampleComponents> for ExampleSystem {
     fn as_any(&mut self) -> &mut dyn Any { self }
 }
 
-pub trait System<Components: Clone + Default> {
-    
+
+pub trait System<C: Components> {
+
     /// During an ECS update, if this system was registered, every Entity will be
     /// passes through a Systems update function. All System updates are called 
     /// in the order they were registered (see ECS in root)
     /// 
     /// Add your own custom system script
     /// 
-    fn update(&mut self, entity: &Pointer, components: &mut Components);
+    fn update(&mut self, entity: &Pointer, components: &mut C, events: &mut EventHooks<C::Events>);
 
     /// Used for casting Systems back down to their origional type
     /// 
