@@ -29,8 +29,9 @@
 //! }
 //! ```
 
-use crate::entities::*;
-use crate::component::*;
+use crate::entities::Entity;
+use crate::component::ExampleComponents;
+use crate::pool::Pointer;
 use std::any::Any;
 
 
@@ -47,8 +48,8 @@ impl ExampleSystem {
 
 impl System<ExampleComponents> for ExampleSystem {
 
-    fn update (&mut self, entity: &mut Entity<ExampleComponents>) {
-        entity.components.value += 1;
+    fn update (&mut self, entity: &Pointer, components: &mut ExampleComponents) {
+        components.value += 1;
         self.was_called = true;
     }
 
@@ -63,7 +64,7 @@ pub trait System<Components: Clone + Default> {
     /// 
     /// Add your own custom system script
     /// 
-    fn update(&mut self, entity: &mut Entity<Components>);
+    fn update(&mut self, entity: &Pointer, components: &mut Components);
 
     /// Used for casting Systems back down to their origional type
     /// 

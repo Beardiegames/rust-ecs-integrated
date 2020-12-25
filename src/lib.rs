@@ -108,7 +108,7 @@ impl<Components: Clone + Default> ECS<Components> {
     /// 
     pub fn update(&mut self) {
         for system in &mut self.systems {
-            self.entities.edit_all(|e| system.update(e)); 
+            self.entities.edit_all(|e| system.update(&e.pointer(), &mut e.components)); 
         }
     }
 }
@@ -122,7 +122,6 @@ mod tests {
     // mockups
 
     struct AssertSystem {
-        expected_name: String,
         expected_pointer: Pointer,
         expected_value: u64,
         is_called: bool,
@@ -130,11 +129,11 @@ mod tests {
     impl System<ExampleComponents> for AssertSystem {
         fn update (
             &mut self, 
-            entity: &mut Entity<ExampleComponents>
+            entity: &Pointer,
+            components: &mut ExampleComponents
         ){
-            assert_eq!(entity.name(), self.expected_name, "AssertSystem -- assert name failed!");
-            assert_eq!(entity.pointer(), self.expected_pointer, "AssertSystem -- assert pointer failed!");
-            assert_eq!(entity.components.value, self.expected_value, "AssertSystem -- assert components.value failed!");
+            assert_eq!(*entity, self.expected_pointer, "AssertSystem -- assert pointer failed!");
+            assert_eq!(components.value, self.expected_value, "AssertSystem -- assert components.value failed!");
             self.is_called = true;
         }
 
@@ -147,9 +146,10 @@ mod tests {
     impl System<ExampleComponents> for AddSystem {
         fn update (
             &mut self, 
-            entity: &mut Entity<ExampleComponents>
+            entity: &Pointer,
+            components: &mut ExampleComponents
         ) {
-            entity.components.value += 1;
+            components.value += 1;
         }
 
         fn as_any(&mut self) -> &mut dyn Any { self }
@@ -159,10 +159,11 @@ mod tests {
     impl System<ExampleComponents> for SubtractSystem {
         fn update (
             &mut self, 
-            entity: &mut Entity<ExampleComponents>
+            entity: &Pointer,
+            components: &mut ExampleComponents
         ) {
-            if entity.components.value > 0 {
-                entity.components.value -= 1;
+            if components.value > 0 {
+                components.value -= 1;
             }
         }
 
@@ -192,7 +193,6 @@ mod tests {
     #[test]
     fn spawn_and_update_entity() {
         let assert_sys = AssertSystem {
-            expected_name: "test-entity-x".to_string(),
             expected_pointer: 123,
             expected_value: 0,
             is_called: false,
@@ -204,8 +204,7 @@ mod tests {
         let spawn1 = ecs.entities().spawn();
         assert_eq!(spawn1.is_err(), false, "Spawn should return a pointer");
         let pointer = spawn1.unwrap();
-        ecs.entities().edit(&pointer, |e| e.change_name("test-entity-x"));
-
+        
         match ecs.get_system::<AssertSystem>(sys_pointer) {
             Some(sys) => {
                 sys.expected_pointer = pointer;
