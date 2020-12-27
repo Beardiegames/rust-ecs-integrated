@@ -41,28 +41,13 @@ use component::*;
 pub mod pool;
 use pool::*;
 
+/// Module for communicating between Entities while being updated by systems.
+pub mod events;
+use events::*;
+
 
 /// SystemPointer is used to locate registered Systems within the ECS module.
 type SystemPointer = usize;
-
-#[derive(Clone)]
-pub struct EventHook<Events: Clone> {
-    target: Pointer,
-    event: Events,
-}
-
-pub struct EventHooks<Events: Clone> (Vec<EventHook<Events>>);
-
-impl<Events: Clone> EventHooks<Events> {
-
-    pub fn tell(&mut self, entity: Pointer, todo: Events) {
-        self.0.push(EventHook { target: entity, event: todo })
-    }
-
-    pub fn clear(&mut self) { self.0.clear() }
-
-    pub fn list(&self) -> &Vec<EventHook<Events>> { &self.0 }
-}
 
 /// ECS manages registered Systems and controls the Pool which manages all Entities.
 ///
@@ -172,14 +157,16 @@ impl<C: Components> ECS<C> {
     /// Put this inside a loop to update your Systems every frame.
     /// 
     pub fn update(&mut self) {
-        let mut events = EventHooks(Vec::new());
+        let mut hooks: Messenger<C::Events> = Messenger::new();
 
         for system in &mut self.systems {
-            events.clear();  
-            self.entities.edit_all(|e| system.update(&e.pointer, &mut e.components, &mut events)); 
+            hooks.clear();
+
+            self.entities.edit_all(|e| system.update(&e.pointer, &mut e.components, &mut hooks)); 
             
-            for hook in events.list() {
-                self.entities.edit(&hook.target, |e| e.components.event_handler(hook.event.clone()));
+            for h in hooks.list() {
+                self.entities.edit(&h.receiver, |e| 
+                    e.components.event_handler(h.event.clone(), h.sender));
             }
         }
     }
@@ -199,14 +186,13 @@ mod tests {
         is_called: bool,
     }
     impl System<ExampleComponents> for AssertSystem {
-        fn update(
-            &mut self, 
-            entity: &Pointer,
-            components: &mut ExampleComponents,
-            events: &mut EventHooks<<ExampleComponents as Components>::Events>,
+        fn update(&mut self, 
+            e: &Pointer,
+            c: &mut ExampleComponents,
+            m: &mut Messenger<ExampleEvents>,
         ){
-            assert_eq!(*entity, self.expected_pointer, "AssertSystem -- assert pointer failed!");
-            assert_eq!(components.value, self.expected_value, "AssertSystem -- assert components.value failed!");
+            assert_eq!(*e, self.expected_pointer, "AssertSystem -- assert pointer failed!");
+            assert_eq!(c.value, self.expected_value, "AssertSystem -- assert components.value failed!");
             self.is_called = true;
         }
 
@@ -217,13 +203,12 @@ mod tests {
 
     struct AddSystem;
     impl System<ExampleComponents> for AddSystem {
-        fn update(
-            &mut self, 
-            entity: &Pointer,
-            components: &mut ExampleComponents,
-            events: &mut  EventHooks<<ExampleComponents as Components>::Events>,
+        fn update(&mut self, 
+            e: &Pointer,
+            c: &mut ExampleComponents,
+            m: &mut  Messenger<ExampleEvents>,
         ) {
-            components.value += 1;
+            c.value += 1;
         }
 
         fn as_any(&mut self) -> &mut dyn Any { self }
@@ -231,14 +216,31 @@ mod tests {
 
     struct SubtractSystem;
     impl System<ExampleComponents> for SubtractSystem {
-        fn update(
-            &mut self, 
-            entity: &Pointer,
-            components: &mut ExampleComponents,
-            events: &mut  EventHooks<<ExampleComponents as Components>::Events>
+        fn update(&mut self, 
+            e: &Pointer,
+            c: &mut ExampleComponents,
+            m: &mut  Messenger<ExampleEvents>
         ) {
-            if components.value > 0 {
-                components.value -= 1;
+            if c.value > 0 {
+                c.value -= 1;
+            }
+        }
+
+        fn as_any(&mut self) -> &mut dyn Any { self }
+    }
+
+    struct HealSystem {
+        pub sender: Pointer,
+        pub receiver: Pointer,
+    }
+    impl System<ExampleComponents> for HealSystem {
+        fn update(&mut self, 
+            e: &Pointer,
+            c: &mut ExampleComponents,
+            m: &mut  Messenger<ExampleEvents>,
+        ) {
+            if *e == self.sender {
+                m.tell(self.receiver, ExampleEvents::Heal(8));
             }
         }
 
@@ -319,6 +321,20 @@ mod tests {
     }
 
     #[test]
+    fn event_messenger() {
+        let mut ecs = ECS::<ExampleComponents>::new(100);
+        let sender = ecs.spawn_entity().unwrap();
+        let receiver = ecs.spawn_entity().unwrap();
+        let _heal = ecs.register_system(HealSystem { sender, receiver });
+
+        ecs.get_entity(&receiver, |c| assert_eq!(c.value, 0));
+        ecs.update();
+        ecs.get_entity(&receiver, |c| assert_eq!(c.value, 8));
+        ecs.update();
+        ecs.get_entity(&receiver, |c| assert_eq!(c.value, 16));
+    }
+
+    #[test]
     fn test_speed() {
         let mut ecs = ECS::<ExampleComponents>::new(1);
         ecs.register_system(AddSystem);
@@ -354,6 +370,6 @@ Try testing in release mode: cargo test --release",
             );
         }
 
-        ecs.get_entity(&entity_pointer, |c| assert_eq!(c.value, num_calls*fps));
+        ecs.get_entity(&entity_pointer, |c| assert_eq!(c.value, num_calls * fps));
     }
 }

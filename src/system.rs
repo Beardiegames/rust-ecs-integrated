@@ -2,7 +2,7 @@
 //! # Example System Implementation
 //! 
 //! ```
-//! use ecs::EventHooks;
+//! use ecs::events::{ Messenger, ExampleEvents };
 //! use ecs::component::{ Components, ExampleComponents };
 //! use ecs::pool::Pointer;
 //! use ecs::system::System;
@@ -25,7 +25,7 @@
 //!         &mut self, 
 //!         entity: &Pointer, 
 //!         components: &mut ExampleComponents, 
-//!         events: &mut EventHooks<<ExampleComponents as Components>::Events>
+//!         messenger: &mut Messenger<ExampleEvents>
 //!     ) {
 //!         components.value += 1;
 //!         self.was_called = true;
@@ -35,8 +35,7 @@
 //! }
 //! ```
 
-use crate::*;
-use crate::entities::Entity;
+use crate::events::*;
 use crate::component::*;
 use crate::pool::Pointer;
 use std::any::Any;
@@ -57,11 +56,11 @@ impl System<ExampleComponents> for ExampleSystem {
 
     fn update(
         &mut self, 
-        entity: &Pointer, 
-        components: &mut ExampleComponents, 
-        events: &mut EventHooks<<ExampleComponents as Components>::Events>
+        _entity: &Pointer, 
+        _components: &mut ExampleComponents, 
+        _messenger: &mut Messenger<<ExampleComponents as Components>::Events>
     ) {
-        components.value += 1;
+        _components.value += 1;
         self.was_called = true;
     }
 
@@ -77,7 +76,7 @@ pub trait System<C: Components> {
     /// 
     /// Add your own custom system script
     /// 
-    fn update(&mut self, entity: &Pointer, components: &mut C, events: &mut EventHooks<C::Events>);
+    fn update(&mut self, entity: &Pointer, components: &mut C, message: &mut Messenger<C::Events>);
 
     /// Used for casting Systems back down to their origional type
     /// 
