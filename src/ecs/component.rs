@@ -1,6 +1,7 @@
 
 use crate::ecs::Factory;
 use crate::ecs::Entity;
+use crate::ecs::Component;
 
 /// Pointer is a reference to objects in the pool, which is used to find and update these objects.
 /// A Pointer can hold a reference to an object that doesn't exist anymore,
@@ -35,16 +36,17 @@ impl PoolTestType {
 
 /// Object pooling system for instantating large number of data types at lower CPU cost.
 /// 
-pub struct Scene<T: Entity> {
-    factories: Vec<Box::<dyn Factory<T>>>,
-    pool: Vec<T>,
+pub struct Scene {
+    factories: Vec<Box::<dyn Factory>>,
+    pool: Vec<Entity>,
     free: Vec<Pointer>,
     in_use: Vec<Spawn>,
     groups: Vec<Vec<Pointer>>,
     itter_count: usize,
+    entity_base: Vec<Box::<dyn Component>>,
 }
 
-impl<T: Entity> Scene<T>  {
+impl Scene {
 
     /// Create a new Object pool manager instance.
     /// 
@@ -55,15 +57,15 @@ impl<T: Entity> Scene<T>  {
     /// that can be passed when spawning. This tag is used for sorting through
     /// spawned objects faster.
     /// 
-    pub fn new(size: usize, factories: Vec<Box::<dyn Factory<T>>>) -> Self {
+    pub fn new(size: usize, entity_base: Vec<Box::<dyn Component>>, factories: Vec<Box::<dyn Factory>>) -> Self {
 
-        let mut pool: Vec<T> = Vec::with_capacity(size);
+        let mut pool: Vec<Entity> = Vec::with_capacity(size);
         let mut free: Vec<Pointer> = Vec::with_capacity(size);
         let in_use: Vec<Spawn> = Vec::with_capacity(size);
         let mut groups: Vec<Vec<Pointer>> = Vec::with_capacity(factories.len());
 
         for i in 0..size { 
-            pool.push(T::default());
+            pool.push(Entity{ components:entity_base });
             free.push(i);
         }
 
@@ -71,23 +73,30 @@ impl<T: Entity> Scene<T>  {
             groups.push(Vec::with_capacity(size));
         }
 
-        Scene { factories, pool, free, in_use, groups, itter_count: 0, } 
+        Scene { factories, pool, free, in_use, groups, itter_count: 0, entity_base } 
     }
 
-    pub fn get(&self, spawn: &Spawn) -> &T { 
+    pub fn update_component(&mut self, component_index: usize, spawn: &Spawn) {
+        self.pool[spawn.pointer].components[component_index].update(&spawn, &mut self)
+    }
+
+    pub fn override_field(&mut self, pointer: &Pointer, value: Entity) {
+            
+        if pointer < &self.pool.len() {
+            self.pool[*pointer] = value;
+        }
+    }
+
+    pub fn get(&self, spawn: &Spawn) -> &Entity { 
         &self.pool[spawn.pointer] 
     }
 
-    pub fn get_mut(&mut self, spawn: &Spawn) -> &mut T { 
+    pub fn get_mut(&mut self, spawn: &Spawn) -> &mut Entity { 
         &mut self.pool[spawn.pointer] 
     }
 
-    pub fn set(&mut self, spawn: &Spawn, value: T) { 
-       self.pool[spawn.pointer] = value;
-    }
-
     pub fn test_object<P> (&self, predicate: &mut P) -> Option<Spawn>
-        where P: FnMut(&T) -> bool
+        where P: FnMut(&Entity) -> bool
     {
         for spawn in &self.in_use {
             if predicate(&self.pool[spawn.pointer]) {
@@ -98,7 +107,7 @@ impl<T: Entity> Scene<T>  {
     }
 
     pub fn test_object_ne<P> (&self, predicate: &mut P) -> Option<Spawn>
-        where P: FnMut(&T) -> bool
+        where P: FnMut(&Entity) -> bool
     {
         for spawn in &self.in_use {
             if !predicate(&self.pool[spawn.pointer]) {
@@ -169,7 +178,7 @@ impl<T: Entity> Scene<T>  {
     /// ```
     /// 
     pub fn find_spawn<P> (&self, mut predicate: P) -> Option<Spawn>
-        where P: FnMut(&T) -> bool {
+        where P: FnMut(&Entity) -> bool {
 
         for spawn in &self.in_use { 
             if predicate(&self.pool[spawn.pointer]) {
@@ -192,7 +201,7 @@ impl<T: Entity> Scene<T>  {
     /// will therefore be faster than looping through all spawned objects.
     /// 
     pub fn find_in_group<P> (&self, group: Group, mut predicate: P) -> Option<Spawn>
-        where P: FnMut(&T) -> bool {
+        where P: FnMut(&Entity) -> bool {
 
         if group >= self.groups.len() { return None; }
 
@@ -205,7 +214,7 @@ impl<T: Entity> Scene<T>  {
     }
 
     pub fn compare_against<F> (&self, against: Spawn, mut on_compare: F) -> Option<Spawn>
-        where F: FnMut(&T, &T) -> bool
+        where F: FnMut(&Entity, &Entity) -> bool
     {
         for inner_spawn in &self.in_use {
             if on_compare(
@@ -219,7 +228,7 @@ impl<T: Entity> Scene<T>  {
     }
 
     pub fn compare_all<F> (&self, mut on_compare: F) -> Option<(Spawn, Spawn)>
-        where F: FnMut(&T, &T) -> bool
+        where F: FnMut(&Entity, &Entity) -> bool
     {
         for outer_spawn in &self.in_use {
             for inner_spawn in &self.in_use {
@@ -265,7 +274,7 @@ impl<T: Entity> Scene<T>  {
             Some(pointer) => {
                 self.in_use.push(Spawn { pointer, group });
                 self.groups[group].push(pointer);
-                self.pool[pointer] = self.factories[group].build(&Spawn { pointer, group });
+                self.pool[pointer] = self.factories[group].build();
                 Ok(self.in_use[pointer].clone())
             },
             None => Err(SceneError::Overflow)
@@ -308,7 +317,7 @@ impl<T: Entity> Scene<T>  {
     /// This methode can be called before or after destroying an object.
     /// 
     pub fn wipe(&mut self, pointer: &Pointer) {
-        self.pool[*pointer] = T::default()
+        self.pool[*pointer] = Entity{ components: self.entity_base }
     }
 
     /// Checks if the object at the Pointer position has been spawned.
@@ -346,7 +355,7 @@ impl<T: Entity> Scene<T>  {
     }
 }
 
-impl<T: Entity> Iterator for Scene<T> {
+impl Iterator for Scene {
     type Item = Spawn;
     fn next(&mut self) -> Option<Self::Item> {
         self.itter_count += 1;

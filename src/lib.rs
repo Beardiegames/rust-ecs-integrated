@@ -1,19 +1,32 @@
 
-pub mod systems;
-pub mod game_objects;
+pub mod game;
 pub mod ecs;
 
-use ecs::{ ECS, System, Scene, Spawn };
-use systems::{ MoveSystem, AttackSystem, DamageSystem };
+#[cfg(test)]
+mod tests {
 
-#[test]
-fn main() {
-    let mut ecs = ECS::new(1000, 100)
-        .register_system(Box::new(MoveSystem))
-        .register_system(Box::new(AttackSystem))
-        .register_system(Box::new(DamageSystem));
-    
-    loop {
-        ecs.update();
+    use super::ecs::EcsBuilder;
+    use super::game::factories::*;
+    use super::game::systems::*;
+
+    #[test]
+    fn update() {
+        let mut ecs = EcsBuilder::new(1000)
+            .add_factory(Soldier)
+            .add_factory(Truck)
+            .register_system(MoveSystem)
+            .register_system(AttackSystem)
+            .register_system(DamageSystem)
+            .build();
+        
+        //loop {
+            ecs.update();
+        //}
+    }
+
+
+    #[test]
+    fn components() {
+
     }
 }
