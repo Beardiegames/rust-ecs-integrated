@@ -7,11 +7,13 @@ pub struct MoveSystem;
 
 impl System<GameObject> for MoveSystem {
 
-    fn update(&mut self, spawn: &Spawn, scene: &mut Scene<GameObject>) {
+    fn requirements(&self, target: &GameObject) -> bool {
+        target.has_position()
+        && target.has_movement()
+    }
 
-        if let Some(_movement) = &mut scene.get_mut(spawn).movement {
-            //
-        }
+    fn update(&mut self, spawn: &Spawn, scene: &mut Scene<GameObject>) {
+        // movement script for spawn
     }
 }
 
@@ -20,36 +22,35 @@ pub struct AttackSystem;
 
 impl System<GameObject> for AttackSystem {
 
+    fn requirements(&self, target: &GameObject) -> bool {
+        target.has_position()
+        && target.has_focus()
+        && target.has_attack()
+        && target.has_faction()
+    }
+
     fn update(&mut self, spawn: &Spawn, scene: &mut Scene<GameObject>) {
+        let target = scene.get_mut(spawn);
 
-        let mut object = scene.get_mut(spawn).clone();
-
-        if object.assault.is_some() {
+        // if target has a focus, than attack the first focus
+        if let Some(other_spawn) = target.focus.prime() {
             
-            let mut assault = object.assault.unwrap();
-            let faction = &object.faction;
-            let position = &object.position;
-            let target = assault.target.clone();
+            let opponent = scene.get_mut(other_spawn);
 
-            if assault.target.is_none() {
-
-                assault.target = scene.find_spawn(|x| { 
-                    x.faction != Faction::None
-                    && x.faction != *faction
-                    && position.0 - x.position.0 < 10.0
-                });
-
-            } else {
-
-                let opponent = &mut scene.get_mut(&target.unwrap());
-                let attack = assault.attack.clone();
-
-                if let Some(health) = &mut opponent.health {
-                    health.damage.push(attack)
-                }
+            if opponent.has_health() {
+                opponent.damage.take_damage(target.attack.clone());
             }
-            object.assault = Some(assault);
-            scene.set(spawn, object);
+        
+        // if target doesn't have a focus find and add a new one
+        } else {
+
+            if let Some(spawn) = scene.find_spawn(|other| {
+                other.has_damage() 
+                && target.faction.opposing(&other.faction)
+                && target.position.distance(&other.position) < 10.0
+            }) {
+                target.focus.add(&spawn);
+            }
         }
     }
 }
@@ -58,7 +59,22 @@ impl System<GameObject> for AttackSystem {
 pub struct DamageSystem;
 
 impl System<GameObject> for DamageSystem {
-    fn update(&mut self, _spawn: &Spawn, _scene: &mut Scene<GameObject>) {
 
+    fn requirements(&self, target: &GameObject) -> bool {
+        target.has_health()
+        && target.has_damage()
+    }
+
+    fn update(&mut self, spawn: &Spawn, scene: &mut Scene<GameObject>) {
+        let target = scene.get_mut(spawn);
+
+        for attack in target.damage {
+            target.health.damage(
+                match target.has_brace() {
+                true => target.brace.resolve_attack(&attack),
+                false => attack.power(),
+                }
+            )
+        }
     }
 }

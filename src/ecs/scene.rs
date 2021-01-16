@@ -1,4 +1,6 @@
 
+use std::cell::{ RefCell, Ref, RefMut };
+
 use crate::ecs::Factory;
 use crate::ecs::Entity;
 
@@ -14,6 +16,12 @@ pub struct Spawn {
     pub pointer: Pointer,
     pub group: Group,
 }
+impl PartialEq for Spawn {
+    fn eq(&self, other: &Spawn) -> bool {
+        self.pointer == other.pointer
+    }
+}
+
 
 #[derive(Debug, PartialEq)]
 pub enum SceneError {
@@ -37,7 +45,7 @@ impl PoolTestType {
 /// 
 pub struct Scene<T: Entity> {
     factories: Vec<Box::<dyn Factory<T>>>,
-    pool: Vec<T>,
+    pool: Vec<RefCell<T>>,
     free: Vec<Pointer>,
     in_use: Vec<Spawn>,
     groups: Vec<Vec<Pointer>>,
@@ -57,13 +65,13 @@ impl<T: Entity> Scene<T>  {
     /// 
     pub fn new(size: usize, factories: Vec<Box::<dyn Factory<T>>>) -> Self {
 
-        let mut pool: Vec<T> = Vec::with_capacity(size);
+        let mut pool: Vec<RefCell<T>> = Vec::with_capacity(size);
         let mut free: Vec<Pointer> = Vec::with_capacity(size);
         let in_use: Vec<Spawn> = Vec::with_capacity(size);
         let mut groups: Vec<Vec<Pointer>> = Vec::with_capacity(factories.len());
 
         for i in 0..size { 
-            pool.push(T::default());
+            pool.push(RefCell::new(T::default()));
             free.push(i);
         }
 
@@ -74,34 +82,34 @@ impl<T: Entity> Scene<T>  {
         Scene { factories, pool, free, in_use, groups, itter_count: 0, } 
     }
 
-    pub fn get(&self, spawn: &Spawn) -> &T { 
-        &self.pool[spawn.pointer] 
+    pub fn get(&self, spawn: &Spawn) -> Ref<T> { 
+        self.pool[spawn.pointer].borrow()
     }
 
-    pub fn get_mut(&mut self, spawn: &Spawn) -> &mut T { 
-        &mut self.pool[spawn.pointer] 
+    pub fn get_mut(&self, spawn: &Spawn) -> RefMut<T> { 
+        self.pool[spawn.pointer].borrow_mut()
     }
 
-    pub fn set(&mut self, spawn: &Spawn, value: T) { 
-       self.pool[spawn.pointer] = value;
-    }
+    // pub fn set(&mut self, spawn: &Spawn, value: T) { 
+    //    self.pool[spawn.pointer].borrow_mut() = value;
+    // }
 
-    pub fn test_object<P> (&self, predicate: &mut P) -> Option<Spawn>
+    pub fn test_all_eq<P> (&self, predicate: &mut P) -> Option<Spawn>
         where P: FnMut(&T) -> bool
     {
         for spawn in &self.in_use {
-            if predicate(&self.pool[spawn.pointer]) {
+            if predicate(&self.pool[spawn.pointer].borrow()) {
                 return Some(spawn.clone());
             }
         }
         return None;
     }
 
-    pub fn test_object_ne<P> (&self, predicate: &mut P) -> Option<Spawn>
+    pub fn test_all_ne<P> (&self, predicate: &mut P) -> Option<Spawn>
         where P: FnMut(&T) -> bool
     {
         for spawn in &self.in_use {
-            if !predicate(&self.pool[spawn.pointer]) {
+            if !predicate(&self.pool[spawn.pointer].borrow()) {
                 return Some(spawn.clone());
             }
         }
@@ -172,7 +180,7 @@ impl<T: Entity> Scene<T>  {
         where P: FnMut(&T) -> bool {
 
         for spawn in &self.in_use { 
-            if predicate(&self.pool[spawn.pointer]) {
+            if predicate(&self.pool[spawn.pointer].borrow()) {
                 return Some(
                     Spawn { 
                         pointer: spawn.pointer.clone(), 
@@ -197,7 +205,7 @@ impl<T: Entity> Scene<T>  {
         if group >= self.groups.len() { return None; }
 
         for i in &self.groups[group] { 
-            if predicate(&self.pool[*i]) {
+            if predicate(&self.pool[*i].borrow()) {
                 return Some(Spawn { pointer: i.clone(), group });
             }
         }
@@ -209,8 +217,8 @@ impl<T: Entity> Scene<T>  {
     {
         for inner_spawn in &self.in_use {
             if on_compare(
-                &self.pool[against.pointer], 
-                &self.pool[inner_spawn.pointer]
+                &self.pool[against.pointer].borrow(), 
+                &self.pool[inner_spawn.pointer].borrow()
             ){
                 return Some(inner_spawn.clone());
             }
@@ -224,8 +232,8 @@ impl<T: Entity> Scene<T>  {
         for outer_spawn in &self.in_use {
             for inner_spawn in &self.in_use {
                 if on_compare(
-                    &self.pool[outer_spawn.pointer], 
-                    &self.pool[inner_spawn.pointer]
+                    &self.pool[outer_spawn.pointer].borrow(), 
+                    &self.pool[inner_spawn.pointer].borrow()
                 ){
                     return Some((outer_spawn.clone(), inner_spawn.clone()));
                 }
@@ -265,7 +273,7 @@ impl<T: Entity> Scene<T>  {
             Some(pointer) => {
                 self.in_use.push(Spawn { pointer, group });
                 self.groups[group].push(pointer);
-                self.pool[pointer] = self.factories[group].build(&Spawn { pointer, group });
+                self.pool[pointer].replace(self.factories[group].build(&Spawn { pointer, group }));
                 Ok(self.in_use[pointer].clone())
             },
             None => Err(SceneError::Overflow)
@@ -308,7 +316,7 @@ impl<T: Entity> Scene<T>  {
     /// This methode can be called before or after destroying an object.
     /// 
     pub fn wipe(&mut self, pointer: &Pointer) {
-        self.pool[*pointer] = T::default()
+        self.pool[*pointer].replace(T::default());
     }
 
     /// Checks if the object at the Pointer position has been spawned.

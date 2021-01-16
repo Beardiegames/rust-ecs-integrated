@@ -4,40 +4,45 @@ pub use scene::Scene;
 pub use scene::Spawn;
 pub use scene::Group;
 
-pub trait Factory<T: Entity> {
+pub trait Factory<E: Entity> {
     fn group(&self) -> Group; 
-    fn build(&self, spawn: &Spawn) -> T;
+    fn build(&self, spawn: &Spawn) -> E;
 }
 
-pub trait System<T: Entity> {
-    fn update(&mut self, spawn: &Spawn, scene: &mut Scene<T>);
+pub trait System<E: Entity> {
+    fn requirements(&self, target: &E) -> bool;
+    fn update(&mut self, spawn: &Spawn, scene: &mut Scene<E>);
 }
 
 pub trait Entity: Default + Clone {}
 
-pub struct ECS<T: Entity> {
-    scene: Scene<T>,
-    systems: Vec<Box::<dyn System<T>>>,
+pub trait Component { fn is_active(&self) -> &bool; }
+
+pub struct ECS<E: Entity> {
+    scene: Scene<E>,
+    systems: Vec<Box::<dyn System<E>>>,
 }
 
-impl<T: Entity> ECS<T> {
+impl<E: Entity> ECS<E> {
 
     pub fn update(&mut self) {
         for sys in &mut self.systems {
             for spawn in self.scene.list_spawns() {
-                sys.update(&spawn, &mut self.scene);
+                if sys.requirements(&self.scene.get_mut(&spawn)) {
+                    sys.update(&spawn, &mut self.scene);
+                }
             }
         }
     }
 }
 
-pub struct EcsBuilder<T: Entity> {
+pub struct EcsBuilder<E: Entity> {
     pool_size: usize,
-    systems: Vec<Box::<dyn System<T>>>,
-    factories: Vec<Box::<dyn Factory<T>>>,
+    systems: Vec<Box::<dyn System<E>>>,
+    factories: Vec<Box::<dyn Factory<E>>>,
 }
 
-impl<T: Entity> EcsBuilder<T> {
+impl<E: Entity> EcsBuilder<E> {
 
     pub fn new(pool_size: usize) -> Self {
         EcsBuilder {
@@ -48,20 +53,20 @@ impl<T: Entity> EcsBuilder<T> {
     }
 
     pub fn add_factory<F> (mut self, factory: F) -> Self
-    where F: Factory<T> + 'static
+    where F: Factory<E> + 'static
     {
         self.factories.push(Box::new(factory));
         self
     }
 
     pub fn register_system<S>(mut self, system: S) -> Self 
-    where S: System<T> + 'static
+    where S: System<E> + 'static
     {
         self.systems.push(Box::new(system));
         self
     }
 
-    pub fn build(self) -> ECS<T> {
+    pub fn build(self) -> ECS<E> {
         ECS { 
             scene: Scene::new(self.pool_size, self.factories),
             systems: self.systems
