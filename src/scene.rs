@@ -2,6 +2,7 @@
 use std::cell::{ RefCell, Ref, RefMut };
 
 use crate::types::*;
+use crate::spawns::*;
 
 /// Pointer is a reference to objects in the scene, which is used to find and update these objects.
 /// A Pointer can hold a reference to an object that doesn't exist anymore,

@@ -1,7 +1,8 @@
 
 use std::collections::VecDeque;
 
-use crate::ecs::{ Spawn, Entity, Component };
+use crate::types::{ Entity, Component };
+use crate::spawns::Spawn;
 
 
 #[derive(Default, Clone)]
@@ -144,24 +145,24 @@ impl ImmunityFactor {
 
 #[derive(Default, Clone)]
 pub struct ImpactProtection {
-    against: Impact,
-    immunity_factor: ImmunityFactor,
-    reduction: f32,
+    pub against: Impact,
+    pub immunity_factor: ImmunityFactor,
+    pub reduction: f32,
 }
 
 #[derive(Default, Clone)]
 pub struct AfflictionProtection {
-    against: Affliction,
-    immunity_factor: ImmunityFactor,
-    reduction: f32,
+    pub against: Affliction,
+    pub immunity_factor: ImmunityFactor,
+    pub reduction: f32,
 }
 
 
 #[derive(Default, Clone)]
 pub struct Health {
     active: bool,
-    current_hp: u32,
-    max_hp: u32,
+    pub current_hp: u32,
+    pub max_hp: u32,
 }
 impl Health {
     pub fn from_hp(hp: u32) -> Self {
@@ -223,10 +224,10 @@ impl Component for Focus {
 
 #[derive(Clone, Default)]
 pub struct Attack {
-    active: bool,
-    weapon: Weapon,
-    skill: u32,
-    range: u32,
+    pub active: bool,
+    pub weapon: Weapon,
+    pub skill: u32,
+    pub range: u32,
 }
 impl Attack {
     pub fn power(&self) -> u32 {

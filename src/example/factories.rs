@@ -1,6 +1,8 @@
 
-use crate::ecs::{ Spawn, Factory, Group, Component };
-use crate::game::components::*;
+use crate::spawns::{ Spawn, Group, };
+use crate::types::{ Factory, Component };
+
+use super::components::*;
 
 pub enum Unit {
     Soldier,

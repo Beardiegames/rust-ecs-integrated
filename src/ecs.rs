@@ -1,8 +1,7 @@
 
-use crate::scene;
-pub use scene::Scene;
-pub use scene::Spawn;
-pub use scene::Group;
+pub use crate::scene::*;
+pub use crate::types::*;
+
 
 pub struct ECS<E: Entity> {
     scene: Scene<E>,

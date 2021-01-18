@@ -1,6 +1,9 @@
 
-use crate::ecs::{ Scene, Spawn, System };
-use crate::game::components::*;
+use crate::scene::Scene;
+use crate::spawns::Spawn;
+use crate::types::System;
+
+use super::components::*;
 
 
 pub struct MoveSystem;
@@ -30,12 +33,12 @@ impl System<GameObject> for AttackSystem {
     }
 
     fn update(&mut self, spawn: &Spawn, scene: &mut Scene<GameObject>) {
-        let target = scene.get_mut(spawn);
+        let target = &mut scene.get_mut(spawn);
 
         // if target has a focus, than attack the first focus
         if let Some(other_spawn) = target.focus.prime() {
             
-            let opponent = scene.get_mut(other_spawn);
+            let opponent = &mut scene.get_mut(other_spawn);
 
             if opponent.has_health() {
                 opponent.damage.take_damage(target.attack.clone());
@@ -66,15 +69,14 @@ impl System<GameObject> for DamageSystem {
     }
 
     fn update(&mut self, spawn: &Spawn, scene: &mut Scene<GameObject>) {
-        let target = scene.get_mut(spawn);
+        let target = &mut scene.get_mut(spawn);
 
-        for attack in target.damage {
-            target.health.damage(
-                match target.has_defense() {
+        for attack in target.damage.clone() {
+            let power = match target.has_defense() {
                 true => target.defense.resolve_attack(&attack),
                 false => attack.power(),
-                }
-            )
+            };
+            target.health.damage(power)
         }
     }
 }

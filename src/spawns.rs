@@ -1,6 +1,4 @@
 
-#[derive(Clone)]
-
 use crate::scene::Scene;
 use crate::scene::Pointer;
 
@@ -8,6 +6,7 @@ use crate::scene::Pointer;
 pub type Group = usize;
 
 
+#[derive(Clone)]
 pub struct Name([u8; 16]);
 
 impl PartialEq for Name {
@@ -31,20 +30,20 @@ impl Default for Name {
 
 #[derive(Clone, Default)]
 pub struct Spawn {
-    pointer: Pointer,
-    group: Group,
+    pub(crate) pointer: Pointer,
+    pub(crate) group: Group,
     name: Name,
 }
 
 impl Spawn {
-    fn pointer(&self) -> &Pointer { &self.pointer }
-    fn group(&self) -> &Group { &self.group }
+    pub fn pointer(&self) -> &Pointer { &self.pointer }
+    pub fn group(&self) -> &Group { &self.group }
 
-    fn name(&self) -> &str { 
+    pub fn name(&self) -> &str { 
         std::str::from_utf8(&self.name.0).unwrap()
     }
 
-    fn new_name(&mut self, name: &str) {
+    pub fn new_name(&mut self, name: &str) {
         let bytes = name.as_bytes();
         for i in 0..16 { 
             if i < name.len() { 

@@ -1,6 +1,6 @@
 
 use crate::scene::Scene;
-use crate::spawn::*;
+use crate::spawns::*;
 
 pub trait Factory<E: Entity> {
     fn group(&self) -> Group; 
