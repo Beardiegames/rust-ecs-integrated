@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["ecs"] = [{"text":"impl PartialEq&lt;SceneError&gt; for SceneError","synthetic":false,"types":[]},{"text":"impl PartialEq&lt;Name&gt; for Name","synthetic":false,"types":[]},{"text":"impl PartialEq&lt;Spawn&gt; for Spawn","synthetic":false,"types":[]},{"text":"impl PartialEq&lt;Impact&gt; for Impact","synthetic":false,"types":[]},{"text":"impl PartialEq&lt;Affliction&gt; for Affliction","synthetic":false,"types":[]},{"text":"impl PartialEq&lt;Faction&gt; for Faction","synthetic":false,"types":[]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

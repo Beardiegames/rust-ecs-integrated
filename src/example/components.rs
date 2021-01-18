@@ -52,6 +52,9 @@ impl Movement {
     pub fn from_speed(speed: f32) -> Self {
         Movement { active: true, speed, move_to: None, }
     }
+    pub fn speed(&self) -> &f32 {
+        &self.speed
+    }
 }
 impl Component for Movement {
     fn set_active(&mut self, activate: bool) { self.active = activate; }
@@ -423,11 +426,11 @@ impl Default for Faction {
 #[derive(Default, Clone)]
 pub struct Position {
     active: bool,
-    x: f32,
-    y: f32,
+    pub x: f64,
+    pub y: f64,
 }
 impl Position {
-    pub fn distance(&self, other: &Position) -> f32 {
+    pub fn distance(&self, other: &Position) -> f64 {
         let diff_x = other.x - self.x;
         let diff_y = other.y - self.y;
         ((diff_x * diff_x) + (diff_y * diff_y)).sqrt()

@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["Affliction",""],["Faction",""],["ImmunityFactor",""],["Impact",""]],"struct":[["AfflictionProtection",""],["Afflictions",""],["Agenda",""],["Attack",""],["Carry",""],["Damage",""],["Defense",""],["Focus",""],["GameObject",""],["Health",""],["ImpactProtection",""],["Movement",""],["Position",""],["Resist",""],["Weapon",""]]});

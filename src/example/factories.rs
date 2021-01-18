@@ -6,18 +6,23 @@ use crate::types::{ Factory, Component };
 
 use super::components::*;
 
-pub enum Unit {
-    Soldier,
-    Truck,
-}
-
 // --
 
-pub struct Soldier;
+pub struct Soldier {
+    group: Group,
+}
+
+impl Soldier {
+    pub fn new() -> Self { Soldier { group: 0 } }
+
+    pub fn group(&self) -> &Group { &self.group } 
+}
 
 impl Factory<GameObject> for Soldier {
 
-    fn group(&self) -> Group { Unit::Soldier as usize }
+    fn init(&mut self, group: Group) {
+        self.group = group;
+    }
 
     fn build(&self, spawn: &Spawn) -> GameObject {
         GameObject {
@@ -52,17 +57,27 @@ impl Factory<GameObject> for Soldier {
 
 // --
 
-pub  struct Truck;
+pub struct Truck {
+    group: Group,
+}
+
+impl Truck {
+    pub fn new() -> Self { Truck { group: 0 } }
+
+    pub fn group(&self) -> &Group { &self.group } 
+}
 
 impl Factory<GameObject> for Truck {
 
-    fn group(&self) -> Group { Unit::Truck as usize }
+    fn init(&mut self, group: Group) {
+        self.group = group;
+    }
 
     fn build(&self, _spawn: &Spawn) -> GameObject {
         GameObject {
             position: Position::active(),
             agenda: Agenda::active(),
-            movement: Movement::from_speed(5.0),
+            movement: Movement::from_speed(2.0),
             health: Health::from_hp(30),
             focus: Focus::active(),
             attack: Attack::inactive(),

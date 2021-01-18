@@ -3,7 +3,7 @@ use crate::scene::Scene;
 use crate::spawns::*;
 
 pub trait Factory<E: Entity> {
-    fn group(&self) -> Group; 
+    fn init(&mut self, group: Group);
     fn build(&self, spawn: &Spawn) -> E;
 }
 

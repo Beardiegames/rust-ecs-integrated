@@ -18,7 +18,8 @@ impl System<GameObject> for MoveSystem {
     }
 
     fn update(&mut self, spawn: &Spawn, scene: &mut Scene<GameObject>) {
-        // movement script for spawn
+        let target = &mut scene.get_mut(spawn);
+        target.position.x += *target.movement.speed() as f64;
     }
 }
 

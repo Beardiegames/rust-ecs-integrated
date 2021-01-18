@@ -42,6 +42,11 @@ impl<T: Entity> Scene<T>  {
     /// By setting the 'size' parameter, you preset the maximum amount of 
     /// Object the new pool can hold and therefore spawn.
     /// 
+    /// Factories are custom object factories that implement the Factory trait
+    /// which can be called upon, by the Scene, when spawning a new object. 
+    /// Factories give the user the freedom to create different types of 
+    /// objects by customizing the output of these factories.
+    /// 
     pub fn new(size: usize, factories: Vec<Box::<dyn Factory<T>>>) -> Self {
 
         let mut pool: Vec<RefCell<T>> = Vec::new();
@@ -68,40 +73,49 @@ impl<T: Entity> Scene<T>  {
         Scene { factories, pool, spawns, free, in_use, groups, itter_count: 0, } 
     }
 
-    pub fn spawn_list(&self) -> Vec<Spawn> {
-        self.spawns.clone()
+    pub fn get_factory(&self, group: &Group) -> &Box::<dyn Factory<T>> {
+        &self.factories[*group]
     }
 
-    pub fn get(&self, spawn: &Spawn) -> Ref<T> { 
+    pub fn mut_factory(&mut self, group: &Group) -> &mut Box::<dyn Factory<T>> {
+        &mut self.factories[*group]
+    }
+
+    /// Returns a cloned list of spawn currently in use.
+    /// 
+    pub fn list_spawned(&self) -> Vec<Spawn> {
+        self.in_use.clone()
+    }
+
+    /// Returns a reference to a RefCell box containing the requested object.
+    /// If the spawned object has been destroyed the inactive object will still be returned.
+    /// You can use the methodes exists and exists_in_group to find out if objects are currently active.
+    /// 
+    pub fn get_ref(&self, spawn: &Spawn) -> Ref<T> { 
         self.pool[spawn.pointer].borrow()
     }
 
+    /// Same as the get_ref methode but returns a mutable reference.
+    /// 
     pub fn get_mut(&self, spawn: &Spawn) -> RefMut<T> { 
         self.pool[spawn.pointer].borrow_mut()
     }
 
-    pub fn test_all_eq<P> (&self, predicate: &mut P) -> Option<Spawn>
-        where P: FnMut(&T) -> bool
-    {
-        for spawn in &self.in_use {
-            if predicate(&self.pool[spawn.pointer].borrow()) {
-                return Some(self.spawns[spawn.pointer].clone());
-            }
-        }
-        return None;
-    }
-
-    pub fn test_all_ne<P> (&self, predicate: &mut P) -> Option<Spawn>
+    /// Run a custom test that tells if all active (spawned) objects comply to the predicate specified.
+    /// 
+    pub fn test_all<P> (&self, predicate: &mut P) -> bool
         where P: FnMut(&T) -> bool
     {
         for spawn in &self.in_use {
             if !predicate(&self.pool[spawn.pointer].borrow()) {
-                return Some(self.spawns[spawn.pointer].clone());
+                return false;
             }
         }
-        None
+        true
     }
 
+    /// Find an active (spawned) object by its spawn name.
+    /// 
     pub fn find_spawn(&self, name: &str) -> Option<Spawn> {
 
         for spawn in &self.in_use { 
@@ -112,6 +126,10 @@ impl<T: Entity> Scene<T>  {
         None
     }
 
+    /// Find an active (spawned) object by its spawn name and factory group.
+    /// This methode can be faster as find_spawn, when there are multiple groups, sinds it does not need to itterate over all objects.
+    /// Find_in_group can also come in handy when using the same name in different groups (sinds spawn names do not need to be unique).
+    /// 
     pub fn find_spawn_in_group(&self, name: &str, group: Group) -> Option<Spawn> {
 
         if group >= self.groups.len() { return None; }
@@ -124,6 +142,8 @@ impl<T: Entity> Scene<T>  {
         None
     }
 
+    /// As find_spawn, but lets you write a custom predicate using object values.
+    /// 
     pub fn search_components<P> (&self, mut predicate: P) -> Option<Spawn>
         where P: FnMut(&T) -> bool {
 
@@ -135,6 +155,8 @@ impl<T: Entity> Scene<T>  {
         None
     }
 
+    /// As find_spawn_in_group, but lets you write a custom predicate using object values.
+    /// 
     pub fn search_components_in_group<P> (&self, group: Group, mut predicate: P) -> Option<Spawn>
         where P: FnMut(&T) -> bool {
 
@@ -148,6 +170,9 @@ impl<T: Entity> Scene<T>  {
         None
     }
 
+    /// Compare an objects values, with the values of all other objects. 
+    /// Returns an Option of the Spawn on which the predicate succeeded first, or None is all comparisons failed.
+    /// 
     pub fn compare_against<F> (&self, against: Spawn, mut on_compare: F) -> Option<Spawn>
         where F: FnMut(&T, &T) -> bool
     {
@@ -162,6 +187,9 @@ impl<T: Entity> Scene<T>  {
         None
     }
 
+    /// Compares all values of all objects to eachother.
+    /// Returns an Option of the two Spawn on which the predicate succeeded first, or None is all comparisons failed.
+    /// 
     pub fn compare_all<F> (&self, mut on_compare: F) -> Option<(Spawn, Spawn)>
         where F: FnMut(&T, &T) -> bool
     {
@@ -180,21 +208,25 @@ impl<T: Entity> Scene<T>  {
         None
     }
     
-    pub fn spawn(&mut self, name: &str, group: Group) -> Result<Spawn, SceneError> {
+    /// Spawn a new object. Spawned objects are updated every frame by the core ECS system.
+    /// The spawn methode activates a new object that will inherit all the settings of the factory of the corresponding group. 
+    /// A name must be added to the spawn, this can be used to find the spawn if necessary.
+    /// 
+    pub fn spawn(&mut self, name: &str, group: &Group) -> Result<Spawn, SceneError> {
 
-        if group >= self.groups.len() {
+        if *group >= self.groups.len() {
             return Err(SceneError::GroupNotFound);
         } 
 
         match self.free.pop() {
             Some(pointer) => {
                 self.spawns[pointer].pointer = pointer;
-                self.spawns[pointer].group = group;
+                self.spawns[pointer].group = group.clone();
                 self.spawns[pointer].new_name(name);
                 
                 self.in_use.push(self.spawns[pointer].clone());
-                self.groups[group].push(pointer);
-                self.pool[pointer].replace(self.factories[group].build(&self.spawns[pointer]));
+                self.groups[*group].push(pointer);
+                self.pool[pointer].replace(self.factories[*group].build(&self.spawns[pointer]));
 
                 Ok(self.spawns[pointer].clone())
             },
@@ -202,6 +234,8 @@ impl<T: Entity> Scene<T>  {
         }
     }
 
+    /// Destroy an object. Destroy deactivates an object and therefore stops it from being updated by the core ECS system.
+    /// 
     /// NOTE: Destroy is slow
     pub fn destroy(&mut self, spawn: &Spawn) {
         if let Some(u_index) = self.in_use.iter().position(
@@ -210,7 +244,7 @@ impl<T: Entity> Scene<T>  {
             if let Some(g_index) = self.groups[spawn.group].iter().position(
                 |x| *x == spawn.pointer
             ) {
-                self.in_use.remove(g_index);
+                self.groups[spawn.group].remove(g_index);
             }
 
             self.in_use.remove(u_index);
@@ -222,14 +256,14 @@ impl<T: Entity> Scene<T>  {
         self.pool[*pointer].replace(T::default());
     }
 
-    /// Checks if the object at the Pointer position has been spawned.
+    /// Checks if the object at the Pointer position has been spawned (is active).
     /// 
     pub fn exists(&self, spawn: &Spawn) -> bool {
         self.in_use.contains(spawn)
     }
 
     /// Checks if the object with a specific group tag, and Pointer position 
-    /// has been spawned.
+    /// has been spawned (is active).
     /// 
     /// Only check one group and, in case of many groups containing many objects,
     /// will therefore be faster than looping through all spawned objects.
@@ -242,18 +276,5 @@ impl<T: Entity> Scene<T>  {
     /// 
     pub fn size(&self) -> usize {
         self.pool.len()
-    }
-}
-
-impl<T: Entity> Iterator for Scene<T> {
-    type Item = Spawn;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.itter_count += 1;
-        if self.itter_count < self.in_use.len() {
-            Some(self.in_use[self.itter_count].clone())
-        } else {
-            self.itter_count = 0;
-            None
-        }
     }
 }
