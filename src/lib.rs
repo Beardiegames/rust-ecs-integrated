@@ -1,13 +1,18 @@
 
-pub mod game;
 pub mod ecs;
+pub mod scene;
+pub mod types;
+pub mod spawns;
+
+pub mod example;
+
 
 #[cfg(test)]
 mod tests {
 
     use super::ecs::EcsBuilder;
-    use super::game::factories::*;
-    use super::game::systems::*;
+    use super::example::factories::*;
+    use super::example::systems::*;
 
     #[test]
     fn update() {

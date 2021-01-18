@@ -26,7 +26,7 @@ impl System<GameObject> for AttackSystem {
         target.has_position()
         && target.has_focus()
         && target.has_attack()
-        && target.has_faction()
+        && target.has_agenda()
     }
 
     fn update(&mut self, spawn: &Spawn, scene: &mut Scene<GameObject>) {
@@ -44,9 +44,9 @@ impl System<GameObject> for AttackSystem {
         // if target doesn't have a focus find and add a new one
         } else {
 
-            if let Some(spawn) = scene.find_spawn(|other| {
+            if let Some(spawn) = scene.search_components(|other| {
                 other.has_damage() 
-                && target.faction.opposing(&other.faction)
+                && target.agenda.faction.opposing(&other.agenda.faction)
                 && target.position.distance(&other.position) < 10.0
             }) {
                 target.focus.add(&spawn);
@@ -70,8 +70,8 @@ impl System<GameObject> for DamageSystem {
 
         for attack in target.damage {
             target.health.damage(
-                match target.has_brace() {
-                true => target.brace.resolve_attack(&attack),
+                match target.has_defense() {
+                true => target.defense.resolve_attack(&attack),
                 false => attack.power(),
                 }
             )

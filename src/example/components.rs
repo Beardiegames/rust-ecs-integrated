@@ -7,13 +7,13 @@ use crate::ecs::{ Spawn, Entity, Component };
 #[derive(Default, Clone)]
 pub struct GameObject {
     pub position: Position,
-    pub faction: Faction,
+    pub agenda: Agenda,
     pub movement: Movement,
     pub health: Health,
     pub focus: Focus,
     pub attack: Attack,
     pub damage: Damage,
-    pub brace: Brace,
+    pub defense: Defense,
     pub resist: Resist,
     pub afflictions: Afflictions,
     pub carry: Carry,
@@ -21,13 +21,13 @@ pub struct GameObject {
 
 impl GameObject {
     pub fn has_position(&self) -> bool { *Component::is_active(&self.position) }
-    pub fn has_faction(&self) -> bool { *Component::is_active(&self.faction) }
+    pub fn has_agenda(&self) -> bool { *Component::is_active(&self.agenda) }
     pub fn has_movement(&self) -> bool { *Component::is_active(&self.movement) }
     pub fn has_health(&self) -> bool { *Component::is_active(&self.health) }
     pub fn has_focus(&self) -> bool { *Component::is_active(&self.focus) }
     pub fn has_attack(&self) -> bool { *Component::is_active(&self.attack) }
     pub fn has_damage(&self) -> bool { *Component::is_active(&self.damage) }
-    pub fn has_brace(&self) -> bool { *Component::is_active(&self.brace) }
+    pub fn has_defense(&self) -> bool { *Component::is_active(&self.defense) }
     pub fn has_resist(&self) -> bool { *Component::is_active(&self.resist) }
     pub fn has_afflictions(&self) -> bool { *Component::is_active(&self.afflictions) }
     pub fn has_carry(&self) -> bool { *Component::is_active(&self.carry) }
@@ -46,11 +46,12 @@ pub struct Movement {
     move_to: Option<Position>,
 }
 impl Movement {
-    pub fn new(speed: f32) -> Self {
+    pub fn from_speed(speed: f32) -> Self {
         Movement { active: true, speed, move_to: None, }
     }
 }
 impl Component for Movement {
+    fn set_active(&mut self, activate: bool) { self.active = activate; }
     fn is_active(&self) -> &bool { &self.active }
 }
 
@@ -61,7 +62,7 @@ pub struct Damage {
     incoming: VecDeque<Attack>,
 }
 impl Damage {
-    pub fn new(hp: i32) -> Self {
+    pub fn new() -> Self {
         Damage { active: true, incoming: VecDeque::new() }
     }
     pub fn take_damage(&mut self, attack: Attack) {
@@ -69,6 +70,7 @@ impl Damage {
     }
 }
 impl Component for Damage {
+    fn set_active(&mut self, activate: bool) { self.active = activate; }
     fn is_active(&self) -> &bool { &self.active }
 }
 impl Iterator for Damage {
@@ -80,19 +82,19 @@ impl Iterator for Damage {
 
 
 #[derive(Default, Clone)]
-pub struct Brace {
+pub struct Defense {
     active: bool,
     blockers: Vec<ImpactProtection>,
 }
-impl Brace {
-    pub fn new(hp: i32) -> Self {
-        Brace { active: true, blockers: Vec::new(), }
+impl Defense {
+    pub fn from_blockers(blockers: Vec<ImpactProtection>) -> Self {
+        Defense { active: true, blockers, }
     }
     pub fn resolve_attack(&self, attack: &Attack) -> u32 {
         let mut power = attack.weapon.power.clone();
         for blocker in &self.blockers {
             if blocker.against == attack.weapon.impact {
-                power = (power as f32 * blocker.immunity_factor) as u32;
+                power = (power as f32 * blocker.immunity_factor.as_f32()) as u32;
                 power = (power as f32 - blocker.reduction) as u32;
             }
         }
@@ -100,7 +102,8 @@ impl Brace {
         power
     } 
 }
-impl Component for Brace {
+impl Component for Defense {
+    fn set_active(&mut self, activate: bool) { self.active = activate; }
     fn is_active(&self) -> &bool { &self.active }
 }
 
@@ -111,25 +114,45 @@ pub struct Resist {
     resistances: Vec<AfflictionProtection>,
 }
 impl Resist {
-    pub fn new(hp: i32) -> Self {
-        Resist { active: true, resistances: Vec::new(), }
+    pub fn new(resistances: Vec<AfflictionProtection>) -> Self {
+        Resist { active: true, resistances, }
     }
 }
 impl Component for Resist {
+    fn set_active(&mut self, activate: bool) { self.active = activate; }
     fn is_active(&self) -> &bool { &self.active }
+}
+
+#[derive(Clone)]
+pub enum ImmunityFactor {
+    None,
+    Half,
+    Full,
+}
+impl Default for ImmunityFactor {
+    fn default() -> Self { ImmunityFactor::None }
+}
+impl ImmunityFactor {
+    fn as_f32(&self) -> f32 { 
+        match self {
+            Self::None => 1.0,
+            Self::Half => 0.5,
+            Self::Full => 0.0,
+        }
+    }
 }
 
 #[derive(Default, Clone)]
 pub struct ImpactProtection {
     against: Impact,
-    immunity_factor: f32,
+    immunity_factor: ImmunityFactor,
     reduction: f32,
 }
 
 #[derive(Default, Clone)]
 pub struct AfflictionProtection {
     against: Affliction,
-    immunity_factor: f32,
+    immunity_factor: ImmunityFactor,
     reduction: f32,
 }
 
@@ -141,7 +164,7 @@ pub struct Health {
     max_hp: u32,
 }
 impl Health {
-    pub fn new(hp: u32) -> Self {
+    pub fn from_hp(hp: u32) -> Self {
         Health { active: true, current_hp: hp, max_hp: hp }
     }
     pub fn heal(&mut self, hp: u32) {
@@ -154,6 +177,7 @@ impl Health {
     }
 }
 impl Component for Health {
+    fn set_active(&mut self, activate: bool) { self.active = activate; }
     fn is_active(&self) -> &bool { &self.active }
 }
 
@@ -164,7 +188,7 @@ pub struct Focus {
     focus: Vec<Spawn>,
 }
 impl Focus {
-    pub fn new(attack: Attack) -> Self {
+    pub fn new() -> Self {
         Focus { active: true, focus: Vec::new(), }
     }
     pub fn add(&mut self, spawn: &Spawn) {
@@ -192,6 +216,7 @@ impl Focus {
     }
 }
 impl Component for Focus {
+    fn set_active(&mut self, activate: bool) { self.active = activate; }
     fn is_active(&self) -> &bool { &self.active }
 }
 
@@ -199,7 +224,6 @@ impl Component for Focus {
 #[derive(Clone, Default)]
 pub struct Attack {
     active: bool,
-    from: Spawn,
     weapon: Weapon,
     skill: u32,
     range: u32,
@@ -210,6 +234,7 @@ impl Attack {
     }
 }
 impl Component for Attack {
+    fn set_active(&mut self, activate: bool) { self.active = activate; }
     fn is_active(&self) -> &bool { &self.active }
 }
 
@@ -226,91 +251,91 @@ impl Weapon {
     }
 
 
-    fn Provoke() -> Self { Weapon { 
+    pub fn PROVOKE() -> Self { Weapon { 
         impact: Impact::Mental, 
         effects: vec![Affliction::Annoyed], 
         power: 0,
         range: 10.0,
     }}
-    fn SmartRemarks() -> Self { Weapon { 
+    pub fn SMART_REMARKS() -> Self { Weapon { 
         impact: Impact::Mental, 
         effects: vec![Affliction::Confused], 
         power: 0,
         range: 10.0,
     }}
-    fn Intimidation() -> Self { Weapon { 
+    pub fn INTAMIDATION() -> Self { Weapon { 
         impact: Impact::Mental, 
         effects: vec![Affliction::Scared], 
         power: 0,
         range: 10.0,
     }}
-    fn Handgun() -> Self { Weapon { 
+    pub fn HANDGUN() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![], 
         power: 3,
         range: 40.0,
     }}
-    fn Shotgun() -> Self { Weapon { 
+    pub fn SHOTGUN() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![], 
         power: 5,
         range: 20.0,
     }}
-    fn Rifle() -> Self { Weapon { 
+    pub fn RIFLE() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![], 
         power: 4,
         range: 60.0,
     }}
-    fn Fists() -> Self { Weapon { 
+    pub fn FISTS() -> Self { Weapon { 
         impact: Impact::Bashing, 
         effects: vec![], 
         power: 1,
         range: 0.0,
     }}
-    fn Baton() -> Self { Weapon { 
+    pub fn BATON() -> Self { Weapon { 
         impact: Impact::Bashing, 
         effects: vec![Affliction::Dazzled], 
         power: 2,
         range: 0.0,
     }}
-    fn Rapier() -> Self { Weapon { 
+    pub fn RAPIER() -> Self { Weapon { 
         impact: Impact::Cutting, 
         effects: vec![Affliction::Wounded], 
         power: 4,
         range: 5.0,
     }}
-    fn Spear() -> Self { Weapon { 
+    pub fn SPEAR() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![], 
         power: 3,
         range: 10.0,
     }}
-    fn Needle() -> Self { Weapon { 
+    pub fn NEEDLE() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![Affliction::Poisoned], 
         power: 0,
         range: 0.0,
     }}
-    fn Mortar() -> Self { Weapon { 
+    pub fn MORTAR() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![Affliction::Burning], 
         power: 5,
         range: 40.0,
     }}
-    fn Canon() -> Self { Weapon { 
+    pub fn CANON() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![Affliction::Burning], 
         power: 8,
         range: 60.0,
     }}
-    fn Missle() -> Self { Weapon { 
+    pub fn MISSLE() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![Affliction::Burning], 
         power: 10,
         range: 100.0,
     }}
-    fn Mine() -> Self { Weapon { 
+    pub fn MINE() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![Affliction::Burning], 
         power: 5, 
@@ -345,9 +370,14 @@ impl Default for Affliction {
     fn default() -> Self { Affliction::Annoyed }
 }
 
-type Afflictions = Vec<Affliction>;
+#[derive(Default, Clone)]
+pub struct Afflictions { 
+    active: bool,
+    list: Vec<Affliction>,
+}
 impl Component for Afflictions {
-    fn is_active(&self) -> &bool { &(self.len() > 0) }
+    fn set_active(&mut self, activate: bool) { self.active = activate }
+    fn is_active(&self) -> &bool { &self.active }
 }
 
 #[derive(Default, Clone)]
@@ -356,7 +386,18 @@ pub struct Carry {
     spawns: Vec<Spawn>,
 }
 impl Component for Carry {
+    fn set_active(&mut self, activate: bool) { self.active = activate; }
     fn is_active(&self) -> &bool { &self.active }
+}
+
+#[derive(Default, Clone)]
+pub struct Agenda {
+    active: bool,
+    pub faction: Faction,
+}
+impl Component for Agenda {
+    fn set_active(&mut self, activate: bool) { self.active = activate; }
+    fn is_active(&self) -> &bool { &(self.active) }
 }
 
 
@@ -376,9 +417,6 @@ impl Faction {
 impl Default for Faction {
     fn default() -> Self { Faction::None }
 }
-impl Component for Faction {
-    fn is_active(&self) -> &bool { &(*self != Faction::None) }
-}
 
 
 #[derive(Default, Clone)]
@@ -395,5 +433,6 @@ impl Position {
     }
 }
 impl Component for Position {
+    fn set_active(&mut self, activate: bool) { self.active = activate; }
     fn is_active(&self) -> &bool { &self.active }
 }
