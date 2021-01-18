@@ -1,4 +1,6 @@
 
+#![allow(dead_code)]
+
 use std::collections::VecDeque;
 
 use crate::types::{ Entity, Component };
@@ -99,7 +101,6 @@ impl Defense {
                 power = (power as f32 - blocker.reduction) as u32;
             }
         }
-        if power < 0 { power = 0; }
         power
     } 
 }
@@ -174,7 +175,6 @@ impl Health {
     }
     pub fn damage(&mut self, hp: u32) {
         self.current_hp -= hp;
-        if self.current_hp < 0 { self.current_hp = 0; }
     }
 }
 impl Component for Health {
@@ -252,91 +252,91 @@ impl Weapon {
     }
 
 
-    pub fn PROVOKE() -> Self { Weapon { 
+    pub fn provoke() -> Self { Weapon { 
         impact: Impact::Mental, 
         effects: vec![Affliction::Annoyed], 
         power: 0,
         range: 10.0,
     }}
-    pub fn SMART_REMARKS() -> Self { Weapon { 
+    pub fn smart_remarks() -> Self { Weapon { 
         impact: Impact::Mental, 
         effects: vec![Affliction::Confused], 
         power: 0,
         range: 10.0,
     }}
-    pub fn INTAMIDATION() -> Self { Weapon { 
+    pub fn intamidation() -> Self { Weapon { 
         impact: Impact::Mental, 
         effects: vec![Affliction::Scared], 
         power: 0,
         range: 10.0,
     }}
-    pub fn HANDGUN() -> Self { Weapon { 
+    pub fn handgun() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![], 
         power: 3,
         range: 40.0,
     }}
-    pub fn SHOTGUN() -> Self { Weapon { 
+    pub fn shotgun() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![], 
         power: 5,
         range: 20.0,
     }}
-    pub fn RIFLE() -> Self { Weapon { 
+    pub fn rifle() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![], 
         power: 4,
         range: 60.0,
     }}
-    pub fn FISTS() -> Self { Weapon { 
+    pub fn fists() -> Self { Weapon { 
         impact: Impact::Bashing, 
         effects: vec![], 
         power: 1,
         range: 0.0,
     }}
-    pub fn BATON() -> Self { Weapon { 
+    pub fn baton() -> Self { Weapon { 
         impact: Impact::Bashing, 
         effects: vec![Affliction::Dazzled], 
         power: 2,
         range: 0.0,
     }}
-    pub fn RAPIER() -> Self { Weapon { 
+    pub fn rapier() -> Self { Weapon { 
         impact: Impact::Cutting, 
         effects: vec![Affliction::Wounded], 
         power: 4,
         range: 5.0,
     }}
-    pub fn SPEAR() -> Self { Weapon { 
+    pub fn spear() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![], 
         power: 3,
         range: 10.0,
     }}
-    pub fn NEEDLE() -> Self { Weapon { 
+    pub fn needle() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![Affliction::Poisoned], 
         power: 0,
         range: 0.0,
     }}
-    pub fn MORTAR() -> Self { Weapon { 
+    pub fn mortar() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![Affliction::Burning], 
         power: 5,
         range: 40.0,
     }}
-    pub fn CANON() -> Self { Weapon { 
+    pub fn canon() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![Affliction::Burning], 
         power: 8,
         range: 60.0,
     }}
-    pub fn MISSLE() -> Self { Weapon { 
+    pub fn missle() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![Affliction::Burning], 
         power: 10,
         range: 100.0,
     }}
-    pub fn MINE() -> Self { Weapon { 
+    pub fn mine() -> Self { Weapon { 
         impact: Impact::Piercing, 
         effects: vec![Affliction::Burning], 
         power: 5, 

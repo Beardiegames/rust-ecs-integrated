@@ -240,14 +240,6 @@ impl<T: Entity> Scene<T>  {
 
     /// Returns the maximum capacity of the pool.
     /// 
-    /// # Example
-    /// 
-    /// ```
-    /// use ecs::pool::*;
-    /// let mut pool = Pool::<PoolTestType>::new(42);
-    /// assert_eq!(pool.size(), 42); // test if the pools has that capacity
-    /// ```
-    /// 
     pub fn size(&self) -> usize {
         self.pool.len()
     }

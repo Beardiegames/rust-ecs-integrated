@@ -1,4 +1,6 @@
 
+#![allow(unused_variables)]
+
 use crate::spawns::{ Spawn, Group, };
 use crate::types::{ Factory, Component };
 
@@ -26,7 +28,7 @@ impl Factory<GameObject> for Soldier {
             focus: Focus::new(),
             attack: Attack {
                 active: true,
-                weapon: Weapon::RIFLE(),
+                weapon: Weapon::rifle(),
                 skill: 1,
                 range: 10,
             },

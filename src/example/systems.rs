@@ -1,4 +1,6 @@
 
+#![allow(unused_variables)]
+
 use crate::scene::Scene;
 use crate::spawns::Spawn;
 use crate::types::System;
